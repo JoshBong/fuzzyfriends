@@ -4,19 +4,26 @@ Get pinged the moment the pet you want is listed for adoption. Pick the animal, 
 watch. Get a phone push or an email with the link. It runs on your own computer or a Raspberry Pi, with no account
 and no server, and needs nothing but Python 3.9+.
 
-## Install & run
+## Install (Pi, Linux or Mac)
 
 ```sh
-pipx install git+https://github.com/<you>/fuzzyfriend   # or: pip install .
-fuzzyfriend serve                 # settings page at http://127.0.0.1:8484
-fuzzyfriend serve --host 0.0.0.0  # also reachable from your phone on the same network / Tailscale
+curl -fsSL https://raw.githubusercontent.com/JoshBong/fuzzyfriends/main/install.sh | sh
 ```
+
+It starts right away, comes back after a reboot (via an `@reboot` cron line), and prints the address of the settings
+page. Open that address from your phone or laptop to change what you're looking for. Run the same command again to
+update.
+
+The settings page has no login, so anyone on your Wi-Fi can open it. Keep it on a home network or Tailscale; don't
+port-forward it to the internet.
+
+Manual run: `python3 -m fuzzyfriend serve` (add `--host 0.0.0.0` to open it from other devices).
 
 Open the page and set what you want, where to look and how to get alerted. It checks on its own every N minutes while
 `serve` runs. The first check of each source only records what's already listed, so it won't spam you. After that you
 only hear about **new** listings. Hit **watch** on a pet to get pinged if it's adopted or pulled.
 
-Other commands: `fuzzyfriend check` (one pass, for cron), `fuzzyfriend list` (current matches), `fuzzyfriend config`
+Other commands (`python3 -m fuzzyfriend ...`): `check` (one pass, for cron), `list` (current matches), `config`
 (where the config lives: `~/.fuzzyfriend/`, override with `FUZZYFRIEND_HOME`).
 
 ## Alerts
@@ -38,10 +45,5 @@ Other commands: `fuzzyfriend check` (one pass, for cron), `fuzzyfriend list` (cu
 
 To add a site, drop a module into `fuzzyfriend/sources/` that exposes `NAME`, `LABEL`, `DEFAULT_OPTIONS` and
 `fetch_pets(options, filters) -> list[Pet]`, then list it in `sources/__init__.py`.
-
-## Always on
-
-- **macOS**: a launchd agent running `fuzzyfriend serve`.
-- **Pi / Linux**: `systemd --user`, or `@reboot fuzzyfriend serve --host 0.0.0.0` in crontab.
 
 Be polite: the default interval is 30 min, and these are shelters' own sites.
