@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import re
 import threading
 import time
 import urllib.parse
@@ -75,7 +76,8 @@ def page(cfg: dict) -> str:
         srcs += f'''<div class="src"><label><input type="checkbox" name="src" value="{name}"{" checked" if sc.get("enabled") else ""}>
           <b>{esc(mod.LABEL)}</b></label> <span class="meta">{status}</span> {opt_inputs}</div>'''
 
-    watch = "".join(f'<li>{esc(v)} <span class="meta">{esc(k)}</span> <form method="post" action="/unwatch" style="display:inline">'
+    urls = {p["source"] + ":" + p["id"]: p["url"] for p in all_pets}
+    watch = "".join(f'<li><a href="{esc(urls.get(k, "#"))}" target="_blank">{esc(v)}</a> <form method="post" action="/unwatch" style="display:inline">'
                     f'<input type="hidden" name="key" value="{esc(k)}"><button>remove</button></form></li>'
                     for k, v in cfg["watch"].items()) or '<li class="meta">Nothing watched. Hit "watch" on a pet to get a ping if it gets adopted.</li>'
 
@@ -93,6 +95,7 @@ a{{color:var(--accent)}} .meta{{color:var(--muted);font-size:.88em}} .err{{color
 .src{{padding:6px 0;border-bottom:1px solid var(--line)}} .opt{{display:inline-block;margin-left:12px;font-size:.88em}}
 input:not([type=checkbox]){{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px;max-width:100%}}
 button{{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer;margin-top:4px}}
+.paste{{display:flex;gap:6px}} .paste input{{flex:1;min-width:0}}
 .toggles{{margin:-4px 0 12px}} .tog{{background:transparent;color:var(--muted);border:1px solid var(--line);margin:3px 2px}}
 .tog.on{{background:var(--accent);color:#fff;border-color:var(--accent)}}
 fieldset{{border:1px solid var(--line);border-radius:10px;margin:10px 0}} pre{{white-space:pre-wrap;font-size:.8em;color:var(--muted)}}
@@ -101,7 +104,9 @@ fieldset{{border:1px solid var(--line);border-radius:10px;margin:10px 0}} pre{{w
 <form method="post" action="/check"><button>Check now</button> <span class="meta">auto-checks every {cfg["interval_min"]} min</span></form>
 <h2>Matches ({len(pets)})</h2>
 <div class="toggles"><span class="meta">Sites (tap to turn on/off):</span> {toggles}</div><div class="grid">{cards}</div>
-<h2>Watching</h2><ul>{watch}</ul>
+<h2>Watching</h2>
+<form method="post" action="/watch" class="paste"><input name="link" placeholder="paste a pet's link to watch it" required>
+<button>Watch</button></form><ul>{watch}</ul>
 <form method="post" action="/save">
 <h2>What you want</h2>
 <fieldset><legend>Animal</legend>{boxes("species", SPECIES, f["species"])}</fieldset>
@@ -124,6 +129,16 @@ fieldset{{border:1px solid var(--line);border-radius:10px;margin:10px 0}} pre{{w
 <form method="post" action="/test"><button>Send test alert</button></form>
 <h2>Log</h2><pre>{esc(chr(10).join(LOG[-20:]))}</pre>
 </main></body></html>'''
+
+
+def find_by_link(link: str) -> dict | None:
+    """Match a pasted listing URL to a stored pet (any filter, enabled or not)."""
+    link = link.strip().split("?")[0].rstrip("/")
+    for p in store.current(store.connect()):
+        u = p["url"].split("?")[0].rstrip("/")
+        if u == link or re.search(rf"/{re.escape(p['id'])}(/|$)", link):
+            return p
+    return None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -159,7 +174,15 @@ class Handler(BaseHTTPRequestHandler):
             errs = notify.send(cfg, "🐾 fuzzyfriend test", "Alerts are working.")
             log("test alert: " + ("; ".join(errs) if errs else "sent"))
         elif self.path == "/watch":
-            cfg["watch"][one("key")] = one("name")
+            if one("link"):
+                p = find_by_link(one("link"))
+                if not p:
+                    log(f"watch: couldn't find {one('link')} — is that site turned on and checked yet?")
+                    return self._back()
+                cfg["watch"][p["source"] + ":" + p["id"]] = p["name"]
+                log(f"watching {p['name']}")
+            else:
+                cfg["watch"][one("key")] = one("name")
             save(cfg)
         elif self.path == "/unwatch":
             cfg["watch"].pop(one("key"), None)
