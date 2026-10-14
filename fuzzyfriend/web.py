@@ -42,7 +42,16 @@ def boxes(name: str, options: list, chosen: list) -> str:
 
 def page(cfg: dict) -> str:
     db = store.connect()
-    pets = [p for p in store.current(db) if engine.visible(p, cfg)]
+    all_pets = store.current(db)
+    pets = [p for p in all_pets if engine.visible(p, cfg)]
+    per_src = {}
+    for p in all_pets:
+        if engine.matches(p, cfg["filters"]):
+            per_src[p["source"]] = per_src.get(p["source"], 0) + 1
+    toggles = "".join(
+        f'''<form method="post" action="/toggle" style="display:inline"><input type="hidden" name="src" value="{name}">
+        <button class="tog{" on" if cfg["sources"].get(name, {}).get("enabled") else ""}">{esc(mod.LABEL.split(" (")[0])} · {per_src.get(name, 0)}</button></form>'''
+        for name, mod in SOURCES.items())
     runs = {s: (at, n, err) for s, at, n, err in store.runs(db)}
     f, n = cfg["filters"], cfg["notify"]
 
@@ -84,11 +93,14 @@ a{{color:var(--accent)}} .meta{{color:var(--muted);font-size:.88em}} .err{{color
 .src{{padding:6px 0;border-bottom:1px solid var(--line)}} .opt{{display:inline-block;margin-left:12px;font-size:.88em}}
 input:not([type=checkbox]){{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px;max-width:100%}}
 button{{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer;margin-top:4px}}
+.toggles{{margin:-4px 0 12px}} .tog{{background:transparent;color:var(--muted);border:1px solid var(--line);margin:3px 2px}}
+.tog.on{{background:var(--accent);color:#fff;border-color:var(--accent)}}
 fieldset{{border:1px solid var(--line);border-radius:10px;margin:10px 0}} pre{{white-space:pre-wrap;font-size:.8em;color:var(--muted)}}
 </style></head><body><main>
 <h1>🐾 fuzzyfriend</h1>
 <form method="post" action="/check"><button>Check now</button> <span class="meta">auto-checks every {cfg["interval_min"]} min</span></form>
-<h2>Matches ({len(pets)})</h2><div class="grid">{cards}</div>
+<h2>Matches ({len(pets)})</h2>
+<div class="toggles"><span class="meta">Sites (tap to turn on/off):</span> {toggles}</div><div class="grid">{cards}</div>
 <h2>Watching</h2><ul>{watch}</ul>
 <form method="post" action="/save">
 <h2>What you want</h2>
@@ -151,6 +163,10 @@ class Handler(BaseHTTPRequestHandler):
             save(cfg)
         elif self.path == "/unwatch":
             cfg["watch"].pop(one("key"), None)
+            save(cfg)
+        elif self.path == "/toggle":
+            sc = cfg["sources"].setdefault(one("src"), {"enabled": False, "options": {}})
+            sc["enabled"] = not sc.get("enabled")
             save(cfg)
         elif self.path == "/save":
             cfg["filters"] = {"species": form.get("species", []), "age": form.get("age", []), "coat": form.get("coat", []),
