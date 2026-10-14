@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fuzzyfriend"
+version = "0.1.0"
+description = "Get pinged the moment the pet you want is listed for adoption."
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+fuzzyfriend = "fuzzyfriend.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["fuzzyfriend*"]
