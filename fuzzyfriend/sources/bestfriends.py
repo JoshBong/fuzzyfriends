@@ -47,3 +47,27 @@ def fetch_pets(options: dict, filters: dict) -> list[Pet]:
                 coat=coat_from_breed(breed), location=f"Best Friends {loc.replace('-', ' ').title()}",
                 foster="foster" in status.lower()))
     return list(pets.values())
+
+
+def detail(url: str) -> dict:
+    """Page-level status for a watched pet: 'Coming Soon' / 'New Arrival' / offsite / bio / health notes."""
+    t = re.sub(r"<script.*?</script>|<style.*?</style>", "", fetch(url), flags=re.S)
+    t = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", t)))
+    start = t.find("Hi my name is")
+    end = t.find("How to adopt from Best Friends", start)
+    bio = t[start:end].strip() if start >= 0 and end > start else ""
+    m = re.search(r"Meet .+? — ([^!.]+)!", bio)
+    if m:
+        status = m.group(1).strip()
+    elif "Offsite Notice" in bio:
+        status = "At offsite partner"
+    elif "almost ready for adoption" in bio:
+        status = "Almost ready"
+    else:
+        status = "Available"
+    return {
+        "status": status,
+        "bio": bio[:1500],
+        "foster": "in foster" in bio.lower(),
+        "medical": bool(re.search(r"medical|medication|diagnos|special needs|FIV|FeLV|URI|ringworm|vet", bio, re.I)),
+    }

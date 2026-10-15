@@ -38,8 +38,13 @@ def check(log=print) -> None:
             store.record_error(db, name, str(e))
             log(f"{name}: ERROR {e}")
             continue
-        new, gone, first = store.sync(db, name, pets)
-        log(f"{name}: {len(pets)} listed, {len(new)} new, {len(gone)} gone" + (" (baseline)" if first else ""))
+        new, gone, changes, first = store.sync(db, name, pets)
+        log(f"{name}: {len(pets)} listed, {len(new)} new, {len(gone)} gone, {len(changes)} changed"
+            + (" (baseline)" if first else ""))
+        for p, field, old, now in changes:
+            if p.key in cfg["watch"]:
+                notify.send(cfg, f"🔔 {p.name}: {field} changed", f"{p.name}: {field} {old} → {now}\n{p.url}", click=p.url)
+        watch_details(db, cfg, mod, [p for p in pets if p.key in cfg["watch"]], log)
         if not first:  # first run only seeds; existing listings are shown in the UI instead of spamming
             hits += [p for p in new if matches(p, cfg["filters"])]
         for g in gone:
@@ -51,6 +56,34 @@ def check(log=print) -> None:
         body = "\n\n".join(f"{p.line()}\n{p.url}" for p in hits)
         for err in notify.send(cfg, title, body, click=hits[0].url if len(hits) == 1 else ""):
             log(f"notify {err}")
+
+
+def watch_details(db, cfg: dict, mod, pets: list, log=print) -> None:
+    """For watched pets, read their own page and alert when status/bio/health notes change."""
+    if not hasattr(mod, "detail"):
+        return
+    for p in pets:
+        try:
+            d = mod.detail(p.url)
+        except Exception as e:
+            log(f"detail {p.name}: {e}")
+            continue
+        old = store.get_detail(db, p.key)
+        store.put_detail(db, p.key, d)
+        if old is None:
+            continue
+        msgs = []
+        if d["status"] != old["status"]:
+            msgs.append(f"Status: {old['status']} → {d['status']}")
+        if d["medical"] and not old["medical"]:
+            msgs.append("Health / medical notes posted")
+        if d["bio"] != old["bio"]:
+            msgs.append("Bio updated")
+        if msgs:
+            store.event(db, p.key, "detail", "; ".join(msgs))
+            db.commit()
+            log(f"{p.name}: " + "; ".join(msgs))
+            notify.send(cfg, f"🔔 {p.name}: {msgs[0]}", "\n".join(msgs) + f"\n\n{d['bio'][:600]}\n\n{p.url}", click=p.url)
 
 
 def loop(log=print) -> None:

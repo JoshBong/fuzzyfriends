@@ -21,7 +21,7 @@ Manual run: `python3 -m fuzzyfriend serve` (add `--host 0.0.0.0` to open it from
 
 Open the page and set what you want, where to look and how to get alerted. It checks on its own every N minutes while
 `serve` runs. The first check of each source only records what's already listed, so it won't spam you. After that you
-only hear about **new** listings. Hit **watch** on a pet to get pinged if it's adopted or pulled.
+only hear about **new** listings. Hit **watch** on a pet (or paste its link) to get pinged when it's adopted or pulled, when it moves from foster to the center, and, for Best Friends, when its page changes: "Coming Soon" → arrived, bio filled in, or health notes posted.
 
 Other commands (`python3 -m fuzzyfriend ...`): `check` (one pass, for cron), `list` (current matches), `config`
 (where the config lives: `~/.fuzzyfriend/`, override with `FUZZYFRIEND_HOME`).
