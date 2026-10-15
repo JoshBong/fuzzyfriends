@@ -44,7 +44,7 @@ def _email(c: dict, title: str, body: str, click: str) -> None:
 
 def _desktop(c: dict, title: str, body: str, click: str) -> None:
     if sys.platform == "darwin":
-        script = f"display notification {json.dumps(body[:200])} with title {json.dumps(title)} sound name \"Glass\""
+        script = f"display notification {json.dumps(body[:200], ensure_ascii=False)} with title {json.dumps(title, ensure_ascii=False)} sound name \"Glass\""
         subprocess.run(["osascript", "-e", script], check=False)
     elif sys.platform.startswith("linux"):
         subprocess.run(["notify-send", title, body[:200]], check=False)
